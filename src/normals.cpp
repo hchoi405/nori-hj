@@ -15,8 +15,11 @@ class NormalIntegrator : public Integrator {
     /* Return the component-wise absolute
        value of the shading normal as a color */
     Normal3f n = its.shFrame.n.cwiseAbs();
-    //  return Color3f(n.x(), n.y(), n.z());
-    return Color3f(its.t);
+    return Color3f(n.x(), n.y(), n.z());
+    Point3f p = its.p.cwiseAbs();
+    // return Color3f(p.x(), p.y(), p.z());
+    // return Color3f(its.t);
+    // return Color3f(its.uv[0]);
   }
 
   std::string toString() const { return "NormalIntegrator[]"; }

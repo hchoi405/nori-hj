@@ -38,7 +38,8 @@ static void renderBlock(const Scene *scene, Sampler *sampler, ImageBlock &block)
     for (int y=0; y<size.y(); ++y) {
         for (int x=0; x<size.x(); ++x) {
             for (uint32_t i=0; i<sampler->getSampleCount(); ++i) {
-                Point2f pixelSample = Point2f((float) (x + offset.x()), (float) (y + offset.y())) + sampler->next2D();
+                Point2f pixel((float) (x + offset.x()), (float) (y + offset.y()));
+                Point2f pixelSample = pixel + sampler->next2D();
                 Point2f apertureSample = sampler->next2D();
 
                 /* Sample a ray from the camera */
