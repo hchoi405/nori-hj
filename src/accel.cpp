@@ -146,11 +146,8 @@ Node *buildOctree(BoundingBox3f &boundingBox,
 bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node *curr,
               uint32_t &f, bool &foundIntersection, Mesh *mesh_, int depth) {
   Ray3f ray(ray_);
-  // printf("traverse0\n");
   if (curr != NULL) {
-    // printf("traverse1\n");
     if (!(*curr).isLeafNode()) {
-      // printf("traverse2 %d\n", depth);
       for (int i = 0; i < 8; i++) {
         if ((*curr).childNodes[i] != nullptr)
           foundIntersection =
@@ -158,26 +155,11 @@ bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node *curr,
                        foundIntersection, mesh_, depth + 1);
       }
     } else {
-      // printf("traverse3 %d\n", depth);
-      // f = 0;
-      //             ray.maxt = its.t = 1;
-      // its.uv = Point2f(0, 0);
-      // its.mesh = mesh_;
-      // return true;
       float u, v, t;
-      // printf("%d", (curr -> triangles).size());
       if ((curr->bbox).rayIntersect(ray)) {
         for (uint32_t i = 0; i < curr->triangles.size(); i++) {
-          // printf("before triangle\n");
           uint32_t triangle = curr->triangles[i];
-          // printf("after triangle\n");
-
-          // printf("traverse4\n");
-          if (mesh_->rayIntersect(
-                  triangle, ray, u, v,
-                  t)) {  // i -> triangle //compare with bbox? // bool
-                         // rayIntersect(const Ray3f &ray) const
-            // printf("traverse5\n");
+          if (mesh_->rayIntersect(triangle, ray, u, v, t)) {
             if (shadowRay) return true;
 
             if (ray.maxt > t) {
