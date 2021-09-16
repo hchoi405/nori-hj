@@ -12,6 +12,7 @@
 #include <Eigen/Geometry>
 #include <iostream>
 #include <list>
+#include <set>
 #include <vector>
 
 using namespace std;
@@ -20,24 +21,21 @@ NORI_NAMESPACE_BEGIN
 
 class Node {
  public:
-  Node *childNodes[8] = {NULL};
+  Node *childNodes[8] = {nullptr};
   std::vector<uint32_t> triangles;
   BoundingBox3f bbox;
+  bool isLeaf = false;
 
   Node() {}
 
   void addChildNode(Node *node, int i) {
-    if (node != NULL) {
+    if (node != nullptr) {
       childNodes[i] = node;
     }
   }
 
-  void setTriangle(std::vector<uint32_t> triangleList) {
-    // for(uint32_t i = 0; i < triangleList.size(); i++) {
-    //   triangles.push_back(triangleList[i]);
-    // }
-
-    triangles = triangleList;
+  void setTriangle(const std::vector<uint32_t> &triangleList) {
+    triangles.assign(triangleList.begin(), triangleList.end());
   }
 
   // std::vector<Node> getChildNodes () {
@@ -45,16 +43,15 @@ class Node {
   // }
 
   bool isLeafNode() {
-    if (childNodes[0] == NULL) {
-      return true;
-    } else {
-      return false;
+    for (int i = 0; i < 8; ++i) {
+      if (childNodes[i] != nullptr) return false;
     }
+    return true;
   }
 };
 
-Node *buildOctree(BoundingBox3f &, std::vector<uint32_t> &, int, Mesh *);
-// std::vector<uint32_t> triangleList;
+Node *buildOctree(const BoundingBox3f &, const std::vector<uint32_t> &, int,
+                  const Mesh *);
 
 class Tree {
  public:
@@ -65,7 +62,6 @@ class Tree {
     for (uint32_t idx = 0; idx < m_mesh->getTriangleCount(); idx++) {
       triangleList.push_back(idx);
     }
-    // root = buildOctree(m_bbox, triangleList, 1, m_mesh);
   }
 };
 
@@ -78,41 +74,33 @@ void Accel::addMesh(Mesh *mesh) {
   tree = new Tree(m_mesh);
 }
 
+std::set<int> triIndices;
+
 void Accel::build() {
   /* Nothing to do here for now */
-  // std::vector<uint32_t> triangleList;
 
-  // uint32_t idx = 0;
-  // for (uint32_t idx = 0; idx < m_mesh->getTriangleCount(); idx++)
-  // {
-  //   triangleList.push_back(idx);
-  // }
-  // //printf("**%d\n", (int)triangleList.size());
   tree->root = buildOctree(m_bbox, tree->triangleList, 1, m_mesh);
 
-  // tree = new Tree(m_mesh, m_bbox);
+  std::cout << "solution: " << tree->triangleList.size() << std::endl;
+  std::cout << "counter: " << triIndices.size() << std::endl;
 }
 
-Node *buildOctree(BoundingBox3f &boundingBox,
-                  std::vector<uint32_t> &triangleList, int depth,
-                  Mesh *m_mesh) {
+Node *buildOctree(const BoundingBox3f &boundingBox,
+                  const std::vector<uint32_t> &triangleList, int depth,
+                  const Mesh *m_mesh) {
   Node *node = new Node();
-  // printf("alloc done - %d\n", depth);
-
-  // node -> setTriangle(triangleList);
 
   if (triangleList.empty()) {
-    return node;  // null -> node
-  } else if (triangleList.size() <= 10 || depth >= 3) {
+    return nullptr;  // null -> node
+  } else if (triangleList.size() <= 10 || depth >= 5) {
     node->setTriangle(triangleList);
     node->bbox = boundingBox;
-    // printf("------%d\n", (int)triangleList.size());
+    node->isLeaf = true;
+    for (int i : triangleList) triIndices.insert(i);
     return node;
   }
 
   std::vector<uint32_t> triList[8];
-  BoundingBox3f subbox;
-  // node->setTriangle(triangleList);
   node->bbox = boundingBox;
 
   for (int i = 0; i < 8; i++) {
@@ -124,15 +112,13 @@ Node *buildOctree(BoundingBox3f &boundingBox,
         std::max(boundingBox.getCenter()[0], boundingBox.getCorner(i)[0]),
         std::max(boundingBox.getCenter()[1], boundingBox.getCorner(i)[1]),
         std::max(boundingBox.getCenter()[2], boundingBox.getCorner(i)[2]));
-    subbox = BoundingBox3f(minpoint, maxpoint);
+    BoundingBox3f subbox = BoundingBox3f(minpoint, maxpoint);
 
     for (uint32_t idx = 0; idx < triangleList.size(); idx++) {
       uint32_t triangle = triangleList[idx];
-      // printf("1\n");
       BoundingBox3f triBound = m_mesh->getBoundingBox(triangle);
-      // printf("2\n");
 
-      if (triBound.overlaps(subbox, true)) {
+      if (triBound.overlaps(subbox)) {
         triList[i].push_back(triangle);
       }
     }
@@ -146,33 +132,31 @@ Node *buildOctree(BoundingBox3f &boundingBox,
 bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node *curr,
               uint32_t &f, bool &foundIntersection, Mesh *mesh_, int depth) {
   Ray3f ray(ray_);
-  if (curr != NULL) {
-    if (!(*curr).isLeafNode()) {
-      for (int i = 0; i < 8; i++) {
-        if ((*curr).childNodes[i] != nullptr)
-          foundIntersection =
-              traverse(ray_, its, shadowRay, (*curr).childNodes[i], f,
-                       foundIntersection, mesh_, depth + 1);
-      }
-    } else {
-      float u, v, t;
-      if ((curr->bbox).rayIntersect(ray)) {
-        for (uint32_t i = 0; i < curr->triangles.size(); i++) {
-          uint32_t triangle = curr->triangles[i];
-          if (mesh_->rayIntersect(triangle, ray, u, v, t)) {
-            if (shadowRay) return true;
 
-            if (ray.maxt > t) {
-              ray.maxt = t;
-              its.t = t;
-              its.uv = Point2f(u, v);
-              f = triangle;  // index
-              its.mesh = mesh_;
-              foundIntersection = true;
-            }
+  if (curr->isLeaf) {
+    if (curr->bbox.rayIntersect(ray)) {
+      for (uint32_t triangle : curr->triangles) {
+        float u, v, t;
+        if (mesh_->rayIntersect(triangle, ray, u, v, t)) {
+          if (shadowRay) return true;
+
+          if (ray.maxt > t) {
+            ray.maxt = its.t = t;
+            its.uv = Point2f(u, v);
+            its.mesh = mesh_;
+            f = triangle;  // index
+            foundIntersection = true;
           }
         }
       }
+    }
+  }
+
+  for (int i = 0; i < 8; i++) {
+    if (curr->childNodes[i] && curr->childNodes[i]->bbox.rayIntersect(ray)) {
+      foundIntersection =
+          foundIntersection | traverse(ray, its, shadowRay, curr->childNodes[i],
+                                       f, foundIntersection, mesh_, depth + 1);
     }
   }
 
