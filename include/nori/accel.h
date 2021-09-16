@@ -29,8 +29,12 @@ public:
     /// Build the acceleration data structure (currently a no-op)
     void build();
 
+    //bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node* curr, uint32_t &f, bool &foundIntersection);
+
     /// Return an axis-aligned box that bounds the scene
     const BoundingBox3f &getBoundingBox() const { return m_bbox; }
+
+    
 
     /**
      * \brief Intersect a ray against all triangles stored in the scene and
