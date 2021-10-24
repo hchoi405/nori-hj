@@ -3,6 +3,8 @@ project(nori)
 
 add_subdirectory(ext ext_build)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include_directories(
   # Nori include files
   ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -88,6 +90,9 @@ add_executable(nori
   src/microfacet.cpp
   src/mirror.cpp
   src/dielectric.cpp
+
+  # Added
+  src/normals.cpp
 )
 
 add_definitions(${NANOGUI_EXTRA_DEFS})
