@@ -129,25 +129,21 @@ Node *buildOctree(const BoundingBox3f &boundingBox,
   return node;
 }
 
-bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node *curr,
-              uint32_t &f, bool &foundIntersection, Mesh *mesh_, int depth) {
-  Ray3f ray(ray_);
+bool traverse(Ray3f &ray, Intersection &its, bool shadowRay, Node *curr,
+              uint32_t &f, Mesh *mesh_, int depth) {
+  bool foundIntersection = false;
 
   if (curr->isLeaf) {
-    if (curr->bbox.rayIntersect(ray)) {
-      for (uint32_t triangle : curr->triangles) {
-        float u, v, t;
-        if (mesh_->rayIntersect(triangle, ray, u, v, t)) {
-          if (shadowRay) return true;
+    for (uint32_t triangle : curr->triangles) {
+      float u, v, t;
+      if (mesh_->rayIntersect(triangle, ray, u, v, t)) {
+        if (shadowRay) return true;
 
-          if (ray.maxt > t) {
-            ray.maxt = its.t = t;
-            its.uv = Point2f(u, v);
-            its.mesh = mesh_;
-            f = triangle;  // index
-            foundIntersection = true;
-          }
-        }
+        ray.maxt = its.t = t;
+        its.uv = Point2f(u, v);
+        its.mesh = mesh_;
+        f = triangle;  // index
+        foundIntersection = true;
       }
     }
   }
@@ -156,7 +152,7 @@ bool traverse(const Ray3f ray_, Intersection &its, bool shadowRay, Node *curr,
     if (curr->childNodes[i] && curr->childNodes[i]->bbox.rayIntersect(ray)) {
       foundIntersection =
           foundIntersection | traverse(ray, its, shadowRay, curr->childNodes[i],
-                                       f, foundIntersection, mesh_, depth + 1);
+                                       f, mesh_, depth + 1);
     }
   }
 
@@ -187,8 +183,7 @@ bool Accel::rayIntersect(const Ray3f &ray_, Intersection &its,
   //     }
   // }
 
-  foundIntersection = traverse(ray_, its, shadowRay, tree->root, f,
-                               foundIntersection, m_mesh, 0);
+  foundIntersection = traverse(ray, its, shadowRay, tree->root, f, m_mesh, 0);
   // printf("true false OK\n");
 
   if (foundIntersection) {
