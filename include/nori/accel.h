@@ -17,6 +17,20 @@ NORI_NAMESPACE_BEGIN
  * through the geometry.
  */
 class Accel {
+    /**
+     * @brief A node of octree
+     *
+     */
+    struct Node {
+        Node *child[8];
+        std::vector<uint32_t> triangles;
+        BoundingBox3f bbox;
+
+        Node(const BoundingBox3f &box) : bbox(box) {
+            for (int i=0; i<8; ++i) child[i] = nullptr;
+        }
+    };
+
 public:
     /**
      * \brief Register a triangle mesh for inclusion in the acceleration
@@ -54,7 +68,15 @@ public:
     bool rayIntersect(const Ray3f &ray, Intersection &its,
                       bool shadowRay) const;
 
+    /// Build octree using bounding box and triangles
+    Node *buildOctree(const BoundingBox3f &bbox,
+                      std::vector<uint32_t> &triangles);
+
+    // Traverse the node with a ray
+    bool traverseOctree(Node *node, Ray3f &ray) const;
+
 private:
+    Node *root;              ///< Root node of accel
     Mesh *m_mesh = nullptr;  ///< Mesh (only a single one for now)
     BoundingBox3f m_bbox;    ///< Bounding box of the entire scene
 };

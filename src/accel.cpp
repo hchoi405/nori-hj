@@ -16,7 +16,71 @@ void Accel::addMesh(Mesh *mesh) {
     m_bbox = m_mesh->getBoundingBox();
 }
 
-void Accel::build() { /* Nothing to do here for now */ }
+void Accel::build() { /* Nothing to do here for now */
+    std::vector<uint32_t> triangles;
+    for (uint32_t t = 0; t < m_mesh->getTriangleCount(); ++t)
+        triangles.push_back(t);
+    root = buildOctree(m_mesh->getBoundingBox(), triangles);
+
+    for (int i = 0; i < 8; ++i) {
+    }
+}
+
+Accel::Node *Accel::buildOctree(const BoundingBox3f &bbox,
+                                std::vector<uint32_t> &triangles) {
+    if (triangles.empty()) return nullptr;
+
+    if (triangles.size() < 10) {
+        Node *node = new Node(bbox);
+        node->triangles = triangles;
+        return node;
+    }
+
+    std::vector<uint32_t> subTriangles[8];
+    BoundingBox3f subBox[8];
+
+    // Find bounding box for child
+    for (int i = 0; i < 8; ++i) {
+        subBox[i].min = bbox.getCenter().cwiseMin(bbox.getCorner(i));
+        subBox[i].max = bbox.getCenter().cwiseMax(bbox.getCorner(i));
+    }
+
+    // Allocate triangles to child
+    for (uint32_t t : triangles) {
+        for (int i = 0; i < 8; ++i) {
+            if (m_mesh->getBoundingBox(t).overlaps(subBox[i]))
+                subTriangles[i].push_back(t);
+        }
+    }
+
+    Node *node = new Node(bbox);
+    for (int i = 0; i < 8; ++i) {
+        node->child[i] = buildOctree(subBox[i], subTriangles[i]);
+    }
+
+    return node;
+}
+
+bool Accel::traverseOctree(Node *node, Ray3f &ray) const {
+    if (node == nullptr) {
+        return false;
+    } else if (node->triangles.empty()) {
+        return false;
+    } else if (node->triangles.size() < 10) {
+        return true;
+    }
+
+    bool intersect = false;
+    if (node->bbox.rayIntersect(ray)) {
+        for (int i = 0; i < 8; ++i) {
+            if (node->child[i] != nullptr) {
+                intersect = traverseOctree(node->child[i], ray);
+            }
+        }
+    }
+
+    return intersect;
+}
 
 bool Accel::rayIntersect(const Ray3f &ray_, Intersection &its,
                          bool shadowRay) const {
@@ -24,22 +88,24 @@ bool Accel::rayIntersect(const Ray3f &ray_, Intersection &its,
     uint32_t f = (uint32_t)-1;  // Triangle index of the closest intersection
 
     Ray3f ray(ray_);  /// Make a copy of the ray (we will need to update its
-                      /// '.maxt' value)
+    /// '.maxt' value)
 
-    /* Brute force search through all triangles */
-    for (uint32_t idx = 0; idx < m_mesh->getTriangleCount(); ++idx) {
-        float u, v, t;
-        if (m_mesh->rayIntersect(idx, ray, u, v, t)) {
-            /* An intersection was found! Can terminate
-               immediately if this is a shadow ray query */
-            if (shadowRay) return true;
-            ray.maxt = its.t = t;
-            its.uv = Point2f(u, v);
-            its.mesh = m_mesh;
-            f = idx;
-            foundIntersection = true;
-        }
-    }
+    foundIntersection = traverseOctree(root, ray);
+
+    // /* Brute force search through all triangles */
+    // for (uint32_t idx = 0; idx < m_mesh->getTriangleCount(); ++idx) {
+    //     float u, v, t;
+    //     if (m_mesh->rayIntersect(idx, ray, u, v, t)) {
+    //         /* An intersection was found! Can terminate
+    //            immediately if this is a shadow ray query */
+    //         if (shadowRay) return true;
+    //         ray.maxt = its.t = t;
+    //         its.uv = Point2f(u, v);
+    //         its.mesh = m_mesh;
+    //         f = idx;
+    //         foundIntersection = true;
+    //     }
+    // }
 
     if (foundIntersection) {
         /* At this point, we now know that there is an intersection,
